@@ -14,6 +14,9 @@ def diffuse_implicit(field, viscosity, dt, dx):
         return (flatfield - viscosity * dt * lap.flatten())
 
     A = LinearOperator(shape=(dof, dof), matvec=laplacian)
-    result = cg(A, field.flatten(), rtol=1e-5, maxiter=500)[0].reshape(N1, N2)
+    result, info = cg(A, field.flatten(), rtol=1e-5, maxiter=500)
+    result = result.reshape(N1, N2)
+    if info != 0:
+        print(f"Warning: diffusion cg failed, info = {info}")
     return result
 
