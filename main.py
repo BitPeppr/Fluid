@@ -1,53 +1,49 @@
-import random
+import shutil
+import sys
 
-import matplotlib.animation as animation
-import matplotlib.pyplot as plt
 import numpy as np
 
 from advection import advection
 from diffusion import diffuse_implicit
 from projection import pressure_projection
+from render import render
+
+# Ansi Escape Sequences
+ALT_BUFFER_ON  = "\x1b[?1049h"
+ALT_BUFFER_OFF = "\x1b[?1049l"
+HIDE_CURSOR    = "\x1b[?25l"
+SHOW_CURSOR    = "\x1b[?25h"
+MOVE_TOP_LEFT  = "\x1b[H"
+
 
 # Parameters
-grid_height = 40
-grid_width = 100
+grid_height = 80
+grid_width = 200
+grid_width, grid_height = shutil.get_terminal_size((grid_width, grid_height))
 dt = 0.5
 dx = 1.0
+smoke_viscosity = 0.00001
 viscosity = 0.01
-gravity = 0.01
-n_steps = 20
 
 # State
 u = np.zeros((grid_height, grid_width))
 v = np.zeros((grid_height, grid_width))
 p = np.zeros((grid_height - 2, grid_width - 2))
-
-# Visualization setup
-fig, ax = plt.subplots(figsize=(10, 5))
-im = ax.imshow(v, cmap='cividis', origin='lower')
-im.set_clim(-0.5, 0.5)
-quiver = ax.quiver(
-    np.arange(0, grid_width, 2),
-    np.arange(0, grid_height, 2),
-    u[::2, ::2],
-    v[::2, ::2],
-    color='black',
-    scale=20,
-)
-ax.set_title('Fluid Simulation')
+s = np.zeros((grid_height, grid_width))
 
 
-def update(frame):
-    global u, v, p
+def update():
+    global u, v, p, s
 
     
     # Half-step diffusion
     u = diffuse_implicit(u, viscosity, dt / 2, dx)
     v = diffuse_implicit(v, viscosity, dt / 2, dx)
+    s = diffuse_implicit(s, smoke_viscosity, dt / 2, dx)
 
-    # Apply gravity 
-    v -= gravity * dt
-    v[15:35, 45:55] += gravity * dt * 5  * random.uniform(0, 2)  # Add a burst of upward velocity in the center
+    # Apply forces 
+    v += 0.003 * s * dt
+    s[19:28, 47:50] += 0.5
 
     u_old = u.copy()
     v_old = v.copy()
@@ -55,10 +51,12 @@ def update(frame):
     # Advect
     u = advection(u, u_old, v_old, dt, dx)
     v = advection(v, u_old, v_old, dt, dx)
+    s = advection(s, u_old, v_old, dt, dx)
 
     # Finish half-step diffusion
     u = diffuse_implicit(u, viscosity, dt / 2 , dx)
     v = diffuse_implicit(v, viscosity, dt / 2, dx)
+    s = diffuse_implicit(s, smoke_viscosity, dt / 2, dx)
 
     # Boundary conditions (free-slip)
     u[0, :] = u[1, :]
@@ -87,12 +85,26 @@ def update(frame):
 
 
 
-    # Update visualization
-    im.set_data(v)
-    quiver.set_UVC(u[::2, ::2], v[::2, ::2])
-    ax.set_title(f'Fluid Simulation - Step {frame}')
-    return [im, quiver]
+    # Dissipate smoke
+    s *= 0.98
+    return s
+
+def main():
+    sys.stdout.write(ALT_BUFFER_ON + HIDE_CURSOR)
+    sys.stdout.flush()
+
+    try:
+        while True:
+            s = update()
+            rendered = render(s)
+            sys.stdout.write(MOVE_TOP_LEFT + rendered)
+            sys.stdout.flush()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        sys.stdout.write(ALT_BUFFER_OFF + SHOW_CURSOR)
+        sys.stdout.flush()
 
 
-ani = animation.FuncAnimation(fig, update, frames=n_steps, interval=30, blit=True)
-plt.show()
+if __name__ == "__main__":
+    main()

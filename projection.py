@@ -29,10 +29,6 @@ def pressure_projection(u, v, dx, p0):
         x0 = None
 
     p, info = cg(LinearOperator((dof, dof), matvec=poisson_laplacian), rhs, x0=x0, rtol=1e-6, maxiter=200)
-    if info != 0:
-        print("Warning: pressure CG failed, info =", info)
-    residual = rhs - poisson_laplacian(p.ravel())
-    print(f'Residual: {np.linalg.norm(residual)}')
     p = p.reshape(shape_interior)
 
     p = np.pad(p, 1, mode='edge')

@@ -9,9 +9,9 @@ def diffuse_implicit(field, viscosity, dt, dx):
 
     def laplacian(flatfield):
         f = flatfield.reshape((N1, N2))
-        lap = np.zeros_like(f)
-        lap[1:-1, 1:-1] = (f[2:, 1:-1] + f[:-2, 1:-1] + f[1:-1, 2:] + f[1:-1, :-2] - 4 * f[1:-1, 1:-1]) / (dx ** 2)
-        return (flatfield - viscosity * dt * lap.flatten())
+        fp = np.pad(f, 1, mode='edge')
+        lap = (fp[2:, 1:-1] + fp[:-2, 1:-1] + fp[1:-1, 2:] + fp[1:-1, :-2] - 4 * f) / dx ** 2
+        return flatfield - viscosity * dt * lap.ravel()
 
     A = LinearOperator(shape=(dof, dof), matvec=laplacian)
     result, info = cg(A, field.flatten(), rtol=1e-5, maxiter=500)
