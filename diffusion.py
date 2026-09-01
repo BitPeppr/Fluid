@@ -2,7 +2,7 @@ import numpy as np
 from scipy.sparse.linalg import LinearOperator, cg
 
 
-def diffuse_implicit(field, viscosity, dt, dx):
+def diffuse_implicit(field, viscosity, dt, dx, rtol=1e-5, maxiter=500):
     N1 = field.shape[0]
     N2 = field.shape[1]
     dof = N1 * N2
@@ -14,7 +14,7 @@ def diffuse_implicit(field, viscosity, dt, dx):
         return flatfield - viscosity * dt * lap.ravel()
 
     A = LinearOperator(shape=(dof, dof), matvec=laplacian)
-    result, info = cg(A, field.flatten(), rtol=1e-5, maxiter=500)
+    result, info = cg(A, field.flatten(), rtol=rtol, maxiter=maxiter)
     result = result.reshape(N1, N2)
     if info != 0:
         print(f"Warning: diffusion cg failed, info = {info}")

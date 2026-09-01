@@ -2,7 +2,7 @@ import numpy as np
 from scipy.sparse.linalg import LinearOperator, cg
 
 
-def pressure_projection(u, v, dx, p0):
+def pressure_projection(u, v, dx, p0, rtol=1e-6, maxiter=200):
     N1 = u.shape[0]
     N2 = u.shape[1]
 
@@ -28,7 +28,7 @@ def pressure_projection(u, v, dx, p0):
     else:
         x0 = None
 
-    p, info = cg(LinearOperator((dof, dof), matvec=poisson_laplacian), rhs, x0=x0, rtol=1e-6, maxiter=200)
+    p, info = cg(LinearOperator((dof, dof), matvec=poisson_laplacian), rhs, x0=x0, rtol=rtol, maxiter=maxiter)
     p = p.reshape(shape_interior)
 
     p = np.pad(p, 1, mode='edge')

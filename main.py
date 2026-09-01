@@ -1,3 +1,4 @@
+import argparse
 import os
 import re
 import select
@@ -22,19 +23,6 @@ MOVE_TOP_LEFT  = "\x1b[H"
 ENABLE_MOUSE="\x1b[?1000h\x1b[?1002h\x1b[?1006h"
 DISABLE_MOUSE="\x1b[?1002l\x1b[?1006l\x1b[?1000l"
 
-# Interactive elements
-spawn_x = 10
-spawn_y = 10
-
-# Parameters
-grid_height = 80
-grid_width = 200
-grid_width, grid_height = shutil.get_terminal_size((grid_width, grid_height))
-dt = 0.5
-dx = 1.0
-smoke_viscosity = 0.00001
-viscosity = 0.01
-
 spawn_offsets = [
         (0, 0),
         (1, 0), (0, 1), (-1, 0), (0, -1),
@@ -43,24 +31,30 @@ spawn_offsets = [
         (3, 0), (0, 3)
         ]
 
-# State
-u = np.zeros((grid_height, grid_width))
-v = np.zeros((grid_height, grid_width))
-p = np.zeros((grid_height - 2, grid_width - 2))
-s = np.zeros((grid_height, grid_width))
-def update():
-    global u, v, p, s, spawn_x, spawn_y
+MOUSE_PAT = re.compile(rb"\x1b\[<(\d+);(\d+);(\d+)([Mm])")
 
-    
+def parse_cli(argv=None):
+    default_width, default_height = shutil.get_terminal_size((200, 80))
+    parser = argparse.ArgumentParser(description="Terminal-based 2D fluid simulation")
+    parser.add_argument("--width", type=int, default=default_width, help="Grid width")
+    parser.add_argument("--height", type=int, default=default_height, help="Grid height")
+    parser.add_argument("--dt", type=float, default=0.5, help="Time step")
+    parser.add_argument("--dx", type=float, default=1.0, help="Grid spacing")
+    parser.add_argument("--smoke-viscosity", type=float, default=0.00001, help="Smoke viscosity")
+    parser.add_argument("--viscosity", type=float, default=0.01, help="Fluid viscosity")
+    parser.add_argument("--maxiter", type=int, default=500, help="Maximum iterations for pressure solver")
+    parser.add_argument("--rtol", type=float, default=1e-5, help="Relative tolerance for pressure solver")
+    args = parser.parse_args(argv)
+    return args.width, args.height, args.dt, args.dx, args.smoke_viscosity, args.viscosity, args.maxiter, args.rtol
+
+def update(u, v, p, s, spawn_x, spawn_y, viscosity, smoke_viscosity, dt, dx, maxiter, rtol):
     # Half-step diffusion
-    u = diffuse_implicit(u, viscosity, dt / 2, dx)
-    v = diffuse_implicit(v, viscosity, dt / 2, dx)
-    s = diffuse_implicit(s, smoke_viscosity, dt / 2, dx)
+    u = diffuse_implicit(u, viscosity, dt / 2, dx, rtol=rtol, maxiter=maxiter)
+    v = diffuse_implicit(v, viscosity, dt / 2, dx, rtol=rtol, maxiter=maxiter)
+    s = diffuse_implicit(s, smoke_viscosity, dt / 2, dx, rtol=rtol, maxiter=maxiter)
 
     # Apply forces
     v += 0.003 * s * dt
-
-
     for ax, ay in spawn_offsets:
         s[spawn_x + ax, spawn_y + ay] += 1
 
@@ -73,9 +67,9 @@ def update():
     s = advection(s, u_old, v_old, dt, dx)
 
     # Finish half-step diffusion
-    u = diffuse_implicit(u, viscosity, dt / 2 , dx)
-    v = diffuse_implicit(v, viscosity, dt / 2, dx)
-    s = diffuse_implicit(s, smoke_viscosity, dt / 2, dx)
+    u = diffuse_implicit(u, viscosity, dt / 2 , dx, rtol=rtol, maxiter=maxiter)
+    v = diffuse_implicit(v, viscosity, dt / 2, dx, rtol=rtol, maxiter=maxiter)
+    s = diffuse_implicit(s, smoke_viscosity, dt / 2, dx, rtol=rtol, maxiter=maxiter)
 
     # Boundary conditions (free-slip)
     u[0, :] = u[1, :]
@@ -88,7 +82,7 @@ def update():
 
 
     # Project
-    u, v, p = pressure_projection(u, v, dx, p)
+    u, v, p = pressure_projection(u, v, dx, p, rtol=rtol, maxiter=maxiter)
 
 
     # Boundary conditions (free-slip)
@@ -106,13 +100,18 @@ def update():
 
     # Dissipate smoke
     s *= 0.98
-    return s
-
-# pre-compile mouse pattern (SGR 1006: ESC[<Cb;Col;RowM/m)
-MOUSE_PAT = re.compile(rb"\x1b\[<(\d+);(\d+);(\d+)([Mm])")
+    return u, v, p, s
 
 def main():
-    global spawn_x, spawn_y
+    grid_width, grid_height, dt, dx, smoke_viscosity, viscosity, maxiter, rtol = parse_cli()
+    spawn_x = 10
+    spawn_y = 10
+
+    u = np.zeros((grid_height, grid_width))
+    v = np.zeros((grid_height, grid_width))
+    p = np.zeros((grid_height - 2, grid_width - 2))
+    s = np.zeros((grid_height, grid_width))
+
     original_settings = termios.tcgetattr(sys.stdin)
     ttc.setcbreak(sys.stdin.fileno())
     sys.stdout.write(ALT_BUFFER_ON + HIDE_CURSOR + ENABLE_MOUSE)
@@ -122,7 +121,7 @@ def main():
 
     try:
         while True:
-            s = update()
+            u, v, p, s = update(u, v, p, s, spawn_x, spawn_y, viscosity, smoke_viscosity, dt, dx, maxiter, rtol)
             rendered = render(s)
             sys.stdout.write(MOVE_TOP_LEFT + rendered)
             sys.stdout.flush()
@@ -149,7 +148,6 @@ def main():
                         stren = 24
                         u[dis_x - 3:dis_x + 3, dis_y - 5:dis_y + 5] += stren * xx / r * (r < 5)
                         v[dis_x - 3:dis_x + 3, dis_y - 5:dis_y + 5] += stren * yy / r * (r < 5)
-                        
 
                 if b"q" in buf:
                     break
