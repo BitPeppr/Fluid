@@ -10,8 +10,11 @@ def convert_ascii(value, array_max, array_min):
     return gradient[min(int(normalised * gradient_len), gradient_len - 1)]
 
 def render(array):
-    array_max = array.max()
-    array_min = array.min()
+    #array_max = array.max()
+    #array_min = array.min()
+
+    array_max = 2.0
+    array_min = 0
 
     ascii_array = []
     for row in array[::-1]:
