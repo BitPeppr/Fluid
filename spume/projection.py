@@ -21,7 +21,7 @@ def pressure_projection(u, v, dx, p0, rtol=1e-6, maxiter=200):
     rhs -= np.mean(rhs)
 
     if p0 is not None:
-        if p0.shape == (N1, N2): ## [IMPORTANT] maybe no need? check
+        if p0.shape == (N1, N2):
             p0 = p0[1:-1, 1:-1]
         x0 = p0.ravel().copy()
         x0 -= np.mean(x0)

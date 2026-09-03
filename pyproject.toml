@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "spume"
+version = "0.1.1"
+description = "Terminal ASCII 2D fluid simulator"
+readme = 'README.md'
+requires-python = ">=3.13"
+dependencies = ['numpy>=1.27.0', 'scipy>=1.16.0']
+license = { text = "GNU General Public License v3.0" }
+authors = [{ name = 'Martin Chen', email = 'martin.chen.au@gmail.com' }]
+
+[project.scripts]
+spume = "spume.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/bitpeppr/spume"
+
+[tool.hatch.build.targets.wheel]
+packages = ["spume"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/spume",
+  "/README.md",
+  "/pyproject.toml",
+]

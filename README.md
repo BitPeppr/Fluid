@@ -1,4 +1,4 @@
-# Fluid
+# Spume
 
 A python terminal-based fluid simulator with ASCII visualisations and minimal dependencies (no rendering dependencies).
 
@@ -8,3 +8,9 @@ A python terminal-based fluid simulator with ASCII visualisations and minimal de
 - Minimal external dependencies
 - Interactive; click to disperse, WASD to move spawn point
 - Highly extensible; diverse CLI flags to customise physics and visualisation
+
+## Installation
+
+```bash
+pip install spume
+```
